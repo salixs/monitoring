@@ -1,0 +1,106 @@
+listenAddress:
+  value: "0.0.0.0:7202"
+
+logging:
+  level: info
+
+metrics:
+  scope:
+    prefix: "coordinator"
+  prometheus:
+    handlerPath: /metrics
+    listenAddress: 0.0.0.0:7203 # until https://github.com/m3db/m3/issues/682 is resolved
+  sanitization: prometheus
+  samplingRate: 1.0
+  extended: none
+
+tagOptions:
+  idScheme: quoted
+
+carbon:
+  ingester:
+    listenAddress: "0.0.0.0:7204"
+    rules:
+      - pattern: .*
+        aggregation:
+          type: mean
+        policies:
+          - resolution: 10s
+            retention: 6h
+
+clusters:
+  - namespaces:
+      - namespace: agg
+        type: aggregated
+        resolution: 10s
+        retention: 6h
+      - namespace: unagg
+        type: unaggregated
+        retention: 1s
+    client:
+      config:
+        service:
+          env: default_env
+          zone: embedded
+          service: m3db
+          cacheDir: /var/lib/m3kv
+          etcdClusters:
+            - zone: embedded
+              endpoints:
+                - dbnode01:2379
+      writeConsistencyLevel: majority
+      readConsistencyLevel: unstrict_majority
+
+downsample:
+  rules:
+    rollupRules:
+      - name: "requests per second by status code"
+        filter: "__name__:http_requests app:* status_code:* endpoint:*"
+        transforms:
+          - transform:
+              type: "PerSecond"
+          - rollup:
+              metricName: "http_requests_by_status_code"
+              groupBy: ["app", "status_code", "endpoint"]
+              aggregations: ["Sum"]
+        storagePolicies:
+          - resolution: 10s
+            retention: 6h
+  remoteAggregator:
+    client:
+      type: m3msg
+      m3msg:
+        producer:
+          writer:
+            topicName: aggregator_ingest
+            topicServiceOverride:
+              zone: embedded
+              environment: override_test_env
+            placement:
+              isStaged: true
+            placementServiceOverride:
+              namespaces:
+                placement: /placement
+            connection:
+              numConnections: 4
+            messagePool:
+              size: 16384
+              watermark:
+                low: 0.2
+                high: 0.5
+
+ingest:
+  ingester:
+    workerPoolSize: 10000
+    opPool:
+      size: 10000
+    retry:
+      maxRetries: 3
+      jitter: true
+    logSampleRate: 0.01
+  m3msg:
+    server:
+      listenAddress: "0.0.0.0:7507"
+      retry:
+        maxBackoff: 10s
+        jitter: true

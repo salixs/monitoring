@@ -1,0 +1,6 @@
+(vendor/)
+(proto/)
+(gen-go/)
+(.pb.go)
+(_mock.go)
+(_gen.go)

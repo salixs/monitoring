@@ -1,0 +1,24 @@
+syntax = "proto3";
+package admin;
+
+import "github.com/m3db/m3/src/msg/generated/proto/topicpb/topic.proto";
+
+message TopicGetResponse {
+  topicpb.Topic topic = 1;
+  uint32 version = 2;
+}
+
+message TopicInitRequest {
+  uint32 number_of_shards = 1;
+}
+
+message TopicAddRequest {
+  topicpb.ConsumerService consumer_service = 1;
+}
+
+// Request to update a topic and set its consumer services to a new value.
+// CheckAndSet is used based on the version passed.
+message TopicUpdateRequest {
+  repeated topicpb.ConsumerService consumer_services = 1;
+  uint32 version = 2;
+}
